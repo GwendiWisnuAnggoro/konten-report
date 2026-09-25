@@ -1,0 +1,61 @@
+name: Extract Zip and Clean Up
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_filename:
+        description: 'Nama file zip (contoh: my-archive.zip atau project.zip)'
+        required: true
+        type: string
+
+jobs:
+  extract-and-cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Hapus file lain (kecuali workflow & file zip)
+        run: |
+          ZIP_NAME="${{ github.event.inputs.zip_filename }}"
+          WORKFLOW_FILE=".github/workflows/extract-and-clean.yml"
+          
+          if [ ! -f "$ZIP_NAME" ]; then
+            echo "Error: File '$ZIP_NAME' tidak ditemukan di root repository!"
+            exit 1
+          fi
+
+          echo "Menghapus semua file kecuali $WORKFLOW_FILE dan $ZIP_NAME..."
+          
+          # Hapus semua file/folder di root kecuali .github dan file zip
+          find . -mindepth 1 -maxdepth 1 ! -name '.github' ! -name "$ZIP_NAME" ! -name '.git' -exec rm -rf {} +
+          
+          # Hapus file workflow lain jika ada di dalam .github/workflows
+          find .github/workflows -mindepth 1 ! -name "extract-and-clean.yml" -exec rm -rf {} +
+
+      - name: Ekstrak file Zip
+        run: |
+          ZIP_NAME="${{ github.event.inputs.zip_filename }}"
+          echo "Mengekstrak $ZIP_NAME..."
+          unzip -o "$ZIP_NAME" -d .
+
+      - name: Hapus file Zip setelah ekstrak
+        run: |
+          ZIP_NAME="${{ github.event.inputs.zip_filename }}"
+          rm -f "$ZIP_NAME"
+          echo "File $ZIP_NAME berhasil dihapus."
+
+      - name: Hapus file workflow ini
+        run: |
+          rm -f .github/workflows/extract-and-clean.yml
+          echo "Workflow file dihapus."
+
+      - name: Commit dan Push perubahan ke Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A
+          git commit -m "refactor: extract archive and self-destruct workflow"
+          git push
